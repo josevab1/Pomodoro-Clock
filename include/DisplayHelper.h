@@ -70,13 +70,5 @@ void rest_second_display(LiquidCrystal_I2C& lcd, int8_t sec){
     }
 }
 
-void buttonswitch(bool& Last_Button_State, bool& Current_Button_State, uint8_t Button_Pin, bool& Switch_State){
-    Last_Button_State = Current_Button_State;
-    Current_Button_State = digitalRead(Button_Pin);
-    if(Last_Button_State == HIGH && Current_Button_State == LOW){
-        Switch_State = !Switch_State;
-        delay(50);
-    }
-}
 
 #endif
