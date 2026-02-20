@@ -5,23 +5,21 @@
 void work_minute_display(LiquidCrystal_I2C& lcd, int8_t mins){
     lcd.setCursor(5,0);
     if(mins < 1){
-        lcd.print("  0");
+        lcd.print("00");
     }
     else if(mins < 10){
-        lcd.print("  ");
+        lcd.print("0");
         lcd.print(mins);
     }
-    else if(mins < 100){
-        lcd.print(" ");
-        lcd.print(mins);        
-    } 
     else{
         lcd.print(mins);
     }
 }
 
 void work_second_display(LiquidCrystal_I2C& lcd, int8_t sec){
-    lcd.setCursor(9,0);
+    lcd.setCursor(7,0);
+    lcd.print(":");
+    lcd.setCursor(8,0);
     if(sec < 1){
         lcd.print("00");
     }
@@ -39,23 +37,21 @@ void work_second_display(LiquidCrystal_I2C& lcd, int8_t sec){
 void rest_minute_display(LiquidCrystal_I2C& lcd, int8_t mins){
     lcd.setCursor(5,1);
     if(mins < 1){
-        lcd.print("  0");
+        lcd.print("00");
     }
     else if(mins < 10){
-        lcd.print("  ");
+        lcd.print("0");
         lcd.print(mins);
     }
-    else if(mins < 100){
-        lcd.print(" ");
-        lcd.print(mins);        
-    } 
     else{
         lcd.print(mins);
     }
 }
 
 void rest_second_display(LiquidCrystal_I2C& lcd, int8_t sec){
-    lcd.setCursor(9,1);
+    lcd.setCursor(7,1);
+    lcd.print(":");
+    lcd.setCursor(8,1);
     if(sec < 1){
         lcd.print("00 ");
     }
@@ -70,5 +66,8 @@ void rest_second_display(LiquidCrystal_I2C& lcd, int8_t sec){
     }
 }
 
-
+void long_rest_display(LiquidCrystal_I2C& lcd){
+    lcd.setCursor(0,1);
+    lcd.print("LULL:");
+}
 #endif

@@ -6,21 +6,6 @@
 #include "DisplayHelper.h"
 #include "ButtonSwitch.h"
 
-/*
- * LCD RS pin to digital pin 7
- * LCD Enable pin to digital pin 8
- * LCD D4 pin to digital pin 9
- * LCD D5 pin to digital pin 10
- * LCD D6 pin to digital pin 11
- * LCD D7 pin to digital pin 12
- * LCD R/W pin to ground
- * LCD VSS pin to ground
- * LCD VCC pin to 5V
- * 10K resistor:
- * ends to +5V and ground
- * wiper to LCD VO pin (pin 3)
-*/
-
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 Servo servo;
 
@@ -29,15 +14,24 @@ const uint8_t Pomodoro_Button = 2;
 
 ButtonSwitch pomoSwitch(Pomodoro_Button);
 
-int8_t INITIAL_WORK_TIME = 25; // default it to 25 mins
-int8_t INITIAL_REST_TIME = 5; // default it to 5 mins
-int8_t INITIAL_WORK_TIME_SEC = 0; 
-int8_t INITIAL_REST_TIME_SEC = 0;
-int8_t Work_Time = INITIAL_WORK_TIME; // minutes
-int8_t Rest_Time = INITIAL_REST_TIME; // minutes
+int8_t INITIAL_WORK_TIME = 0; // default it to 25 mins
+int8_t INITIAL_REST_TIME = 0; // default it to 5 mins
+int8_t INITIAL_LONG_REST_TIME = 10; //LONG REST 
+
+int8_t INITIAL_WORK_TIME_SEC = 5; 
+int8_t INITIAL_REST_TIME_SEC = 5;
+int8_t INITIAL_LONG_REST_TIME_SEC = 0;
+
+int8_t Work_Time = INITIAL_WORK_TIME; 
+int8_t Rest_Time = INITIAL_REST_TIME; 
+int8_t Long_Rest_Time = INITIAL_LONG_REST_TIME;
+
 static uint64_t lastUpdate = 0;  // Stores the last time we updated
+
 int8_t Work_Time_Sec = INITIAL_WORK_TIME_SEC; 
 int8_t Rest_Time_Sec = INITIAL_REST_TIME_SEC;
+int8_t Long_Rest_Time_Sec = INITIAL_LONG_REST_TIME_SEC; // LONG REST
+
 uint8_t cycle_count = 0;
 bool cycle_counted = false;
 
@@ -76,6 +70,7 @@ bool Current_Edit_Button_State;
 bool Last_Edit_Button_State;
 bool editState = false;
 
+
 void pomo_setup(){
   pinMode(Pomodoro_Button, INPUT_PULLUP);
 
@@ -92,9 +87,6 @@ void pomo_setup(){
   // work_minute_display
   work_minute_display(lcd, Work_Time);
 
-  lcd.setCursor(8,0);
-  lcd.print(":");
-
   // work_second_display
   work_second_display(lcd, Work_Time_Sec);
 
@@ -104,9 +96,6 @@ void pomo_setup(){
 
   // rest_minute_dispaly
   rest_minute_display(lcd, Rest_Time);
-
-  lcd.setCursor(8,1);
-  lcd.print(":");
 
   rest_second_display(lcd, Rest_Time_Sec);
   servo.attach(servo_pin);
@@ -136,7 +125,7 @@ void work_time_tick(){
 
       if(Work_Time_Sec < 0 && Work_Time >= 1){
           Work_Time = Work_Time - 1;
-          Work_Time_Sec = 59; // make this 59 sec for full minute;
+          Work_Time_Sec = 59; // make this 59 sec for full minute; includes 0 digit as 60.
       }
       else if(Work_Time_Sec < 0 && Work_Time < 1){
         Work_Time_Sec = 59;
@@ -183,14 +172,10 @@ void rest_time_tick(){
     rest_second_display(lcd, Rest_Time_Sec);
     
     }
-    //Serial.println(Work_Time);
-    //Serial.print(" ");
     //Serial.println(Rest_Time_Sec);
     //Serial.print(":");
     //Serial.print(Rest_Time);
   }
-
-
 
 void pomo_mode(bool mode){
   bool pomo = digitalRead(Pomodoro_Button);
@@ -221,7 +206,12 @@ void pomo_mode(bool mode){
       //Serial.print(Work_Time);
       //Serial.println(Rest_Time);
       servo.write(135);
-    
+
+      // Bug when pomo is at rest,
+      // Then edit pomo time to more than 0,
+      // Comes here, but is stuck.
+      
+
     }
     else if(Work_Time < 0 && Work_Time_Sec < 0 && Rest_Time >= 0){
       lcd.setCursor(12,1);
@@ -242,6 +232,13 @@ void pomo_mode(bool mode){
       cycle_count = cycle_count + 1;
       cycle_counted = true;
       }
+      if(cycle_counted % 2 == 0){}
+
+// if mode counter is 2 (2 work + 2 rest), 
+// then long rest instead of rest
+
+// lock in mode = true
+
 
       pomo_done = true;
 
@@ -253,11 +250,11 @@ void pomo_mode(bool mode){
       lcd.print("# = ");
       lcd.print(cycle_count);
 
-  work_minute_display(lcd, Work_Time_Appearance);
-  work_second_display(lcd, Work_Time_Sec_Appearance); 
+      work_minute_display(lcd, Work_Time_Appearance);
+      work_second_display(lcd, Work_Time_Sec_Appearance); 
 
-  rest_minute_display(lcd, Rest_Time_Appearance);
-  rest_second_display(lcd, Rest_Time_Sec_Appearance);    
+      rest_minute_display(lcd, Rest_Time_Appearance);
+      rest_second_display(lcd, Rest_Time_Sec_Appearance);    
 
     if(cycle_count > 10){
       lcd.setCursor(11,1);
@@ -268,9 +265,9 @@ void pomo_mode(bool mode){
       lcd.print("     ");
       lcd.setCursor(11,1);
       lcd.print("     ");
+
   }
-      // I can press button million times, would not reset
-      // reset button fax.
+
       if(!pomo){
         Work_Time = INITIAL_WORK_TIME;
         Rest_Time = INITIAL_REST_TIME;
@@ -299,15 +296,19 @@ void pomo_mode(bool mode){
   }
 }
 
+
 void edit_mode(bool state){
   // Cursor Button
   // cursor 5,0 is work time pos, cursor5,1 is rest time pos
   // if at those cursor, can inc or dec rest/work time
-if(INITIAL_WORK_TIME < 1) INITIAL_WORK_TIME = 120;
-if(INITIAL_WORK_TIME > 120) INITIAL_WORK_TIME = 1;
 
-if(INITIAL_REST_TIME < 1) INITIAL_REST_TIME = 120;
-if(INITIAL_REST_TIME > 120) INITIAL_REST_TIME = 1;
+  // If cursor count is hit every 3rd time
+  // then edit long rest
+if(INITIAL_WORK_TIME < 1) INITIAL_WORK_TIME = 99;
+if(INITIAL_WORK_TIME > 99) INITIAL_WORK_TIME = 1;
+
+if(INITIAL_REST_TIME < 1) INITIAL_REST_TIME = 99;
+if(INITIAL_REST_TIME > 99) INITIAL_REST_TIME = 1;
 
   if(state == true){
     lcd.setCursor(12,1);
@@ -315,184 +316,90 @@ if(INITIAL_REST_TIME > 120) INITIAL_REST_TIME = 1;
     servo.write(180);
 
   cursorState = cursorSwitch.as_switch();  
+
   // Editing Work Time 
   if(cursorState == false){
-      lcd.setCursor(11,0);
+      lcd.setCursor(10,0);
       lcd.print("<");
-      lcd.setCursor(11,1);
+      lcd.setCursor(10,1);
       lcd.print(" ");
 
-    if(digitalRead(Inc_Button) == LOW && INITIAL_WORK_TIME <= 120){
+    if(digitalRead(Inc_Button) == LOW && INITIAL_WORK_TIME <= 99 && INITIAL_WORK_TIME != 0){
       delay(250);
       lcd.setCursor(11,0);
       
       INITIAL_WORK_TIME += 1;
       Work_Time = INITIAL_WORK_TIME;
       
-
-      lcd.setCursor(5,0);
-        if(Work_Time > 120){
+        if(Work_Time > 99){
           Work_Time = 1;
-          lcd.print("  ");
-          lcd.print(Work_Time);
-        }
-        else if(Work_Time < 10){
-          lcd.print("  ");
-          lcd.print(Work_Time);
-        }
-        else if(Work_Time < 100){
-          lcd.print(" ");
-          lcd.print(Work_Time);
-        }
-        else{
-          lcd.print(Work_Time);
+          work_minute_display(lcd, Work_Time);
         }
 
-      lcd.setCursor(8,0);
-      lcd.print(":");
-
-      if(Work_Time_Sec < 0){
-        Work_Time_Sec = 0;
-        lcd.print("00");
-      }
-      else if(Work_Time_Sec < 10){
-        lcd.print("0");
-        lcd.print(Work_Time_Sec);
-      }
-      else{
-      lcd.print(Work_Time_Sec);
-      }
+      work_minute_display(lcd,Work_Time);
+      work_second_display(lcd, Work_Time_Sec);
     }
-    else if(digitalRead(Dec_Button)==LOW && INITIAL_WORK_TIME <= 120){
+    else if(digitalRead(Dec_Button)==LOW && INITIAL_WORK_TIME <= 99 && INITIAL_WORK_TIME != 0){
       delay(250);
-  
+      lcd.setCursor(11,1);
+
       INITIAL_WORK_TIME -= 1;
       Work_Time = INITIAL_WORK_TIME;
       
-      lcd.setCursor(5,0);
         if(Work_Time <= 0){
-          Work_Time = 120;
-          lcd.print(Work_Time);
+          Work_Time = 99;
+          work_minute_display(lcd, Work_Time);
         }
-        else if(Work_Time < 10){
-          lcd.print("  ");
-          lcd.print(Work_Time);
-        }
-        else if(Work_Time < 100){
-          lcd.print(" ");
-          lcd.print(Work_Time);
-        }
-        else{
-          lcd.print(Work_Time);
-        }
-
-      lcd.setCursor(8,0);
-      lcd.print(":");
-
-      if(Work_Time_Sec < 0){
-        Work_Time_Sec = 0;
-        lcd.print("00");
-      }
-      else if(Work_Time_Sec < 10){
-        lcd.print("0");
-        lcd.print(Work_Time_Sec);
-      }
-      else{
-      lcd.print(Work_Time_Sec);
-      }
+      work_minute_display(lcd,Work_Time);
+      work_second_display(lcd, Work_Time_Sec);
     }
   }
-  // Editing Rest
+  // if every 3rd press, it is editing long rest
+  // Editing Rest, if every 2nd press, it is editing rest
   else{
-      lcd.setCursor(11,1);
+      lcd.setCursor(10,1);
       lcd.print("<");
-      lcd.setCursor(11,0);
+      lcd.setCursor(10,0);
       lcd.print(" ");
 
-    if(digitalRead(Inc_Button) == LOW && INITIAL_REST_TIME <= 120){
+    if(INITIAL_REST_TIME == 0){
+      state = false;
+    }
+
+    if(digitalRead(Inc_Button) == LOW && INITIAL_REST_TIME <= 99 && INITIAL_REST_TIME != 0){
       delay(250);
 
       INITIAL_REST_TIME += 1;
       Rest_Time = INITIAL_REST_TIME;
 
-      lcd.setCursor(5,1);
-        if(Rest_Time > 120){
-          Rest_Time = 1;
-          lcd.print("  ");
-          lcd.print(Rest_Time);
-        }
-        else if(Rest_Time < 10){
-          lcd.print("  ");
-          lcd.print(Rest_Time);
-        }
-        else if(Rest_Time < 100){
-          lcd.print(" ");
-          lcd.print(Rest_Time);
-        }
-        else{
-          lcd.print(Rest_Time);
-        }
-
-      lcd.setCursor(8,1);
-      lcd.print(":");
-
-      if(Rest_Time_Sec < 0){
-        Rest_Time_Sec = 0;
-        lcd.print("00");
+      if(Rest_Time > 99){
+        Rest_Time = 1;
+        rest_minute_display(lcd, Rest_Time);
       }
-      else if(Rest_Time_Sec < 10){
-        lcd.print("0");
-        lcd.print(Rest_Time_Sec);
-      }
-      else{
-      lcd.print(Rest_Time_Sec);
-      }
+        rest_minute_display(lcd, Rest_Time);
+        rest_second_display(lcd, Rest_Time_Sec);
     }
-    else if(digitalRead(Dec_Button)==LOW && INITIAL_REST_TIME <= 120){
+    else if(digitalRead(Dec_Button)==LOW && INITIAL_REST_TIME <= 99 && INITIAL_REST_TIME != 0){
       delay(250);
 
       INITIAL_REST_TIME -= 1;
       Rest_Time = INITIAL_REST_TIME;
 
-      lcd.setCursor(5,1);
         if(Rest_Time <= 0){
-          Rest_Time = 120;
-          lcd.print(Rest_Time);
+          Rest_Time = 99;
+          rest_minute_display(lcd, Rest_Time);
         }
-        else if(Rest_Time< 10){
-          lcd.print("  ");
-          lcd.print(Rest_Time);
-        }
-        else if(Rest_Time < 100){
-          lcd.print(" ");
-          lcd.print(Rest_Time);
-        }
-        else{
-          lcd.print(Rest_Time);
-        }
+        rest_minute_display(lcd, Rest_Time);
+        rest_second_display(lcd, Rest_Time_Sec);
 
-      lcd.setCursor(8,1);
-      lcd.print(":");
-
-      if(Rest_Time_Sec < 0){
-        Rest_Time_Sec = 0;
-        lcd.print("00");
-      }
-      else if(Rest_Time_Sec < 10){
-        lcd.print("0");
-        lcd.print(Rest_Time_Sec);
-      }
-      else{
-      lcd.print(Rest_Time_Sec);
-      }
     }
   }
 
 }
   else{
-    lcd.setCursor(11,0);
+    lcd.setCursor(10,0);
     lcd.print("    ");
-    lcd.setCursor(11,1);
+    lcd.setCursor(10,1);
     lcd.print("    ");    
 }
 
@@ -511,13 +418,35 @@ void setup() {
 
 void loop() {
 
+
 // Edit Mode
 editState = editSwitch.as_switch();
-edit_mode(editState);
 
 // Pomodoro Mode logic. 
 pomoState = pomoSwitch.as_switch();
-pomo_mode(pomoState);
+
+if( (Work_Time == -1 && Work_Time_Sec == -1) || (Rest_Time == -1 && Rest_Time_Sec == -1)){
+  editState = false;
+}
+
+if(pomoState == true && editState == true){
+  editState = false;
+  pomoState = true;
+  pomo_mode(pomoState);
+  edit_mode(editState);
+}
+else if(editState == true){
+  edit_mode(editState);
+}
+else if(pomoState == true){
+  pomo_mode(pomoState);
+}
+
+else if(pomoState == false && editState == false){
+  pomo_mode(pomoState);
+  edit_mode(editState);
+  servo.write(servo_pos);
+}
 
 if(pomo_done == true){
     lcd.setCursor(12,1);
@@ -525,12 +454,7 @@ if(pomo_done == true){
     pomo_done = false;
 }
 
-if(pomoState == true && editState == true){
-  editState = false;
-  pomoState = true;
+Serial.print(Work_Time_Sec);
+Serial.println(Rest_Time_Sec);
 }
 
-else if(pomoState == false && editState == false){
-  servo.write(servo_pos);
-}
-}
