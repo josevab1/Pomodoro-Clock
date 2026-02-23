@@ -66,8 +66,38 @@ void rest_second_display(LiquidCrystal_I2C& lcd, int8_t sec){
     }
 }
 
-void long_rest_display(LiquidCrystal_I2C& lcd){
+void long_rest_minute_display(LiquidCrystal_I2C& lcd, int8_t mins){
     lcd.setCursor(0,1);
-    lcd.print("LULL:");
+    lcd.print("LNGREST:");
+    lcd.setCursor(7,1);
+    if(mins < 1){
+        lcd.print("00");
+    }
+    else if(mins < 10){
+        lcd.print("0");
+        lcd.print(mins);
+    }
+    else{
+        lcd.print(mins);
+    }
 }
+
+void long_rest_second_display(LiquidCrystal_I2C& lcd, int8_t sec){
+    lcd.setCursor(10,1);
+    lcd.print(":");
+    lcd.setCursor(11,1);
+    if(sec < 1){
+        lcd.print("00 ");
+    }
+    else if(sec < 10){
+        lcd.print("0");
+        lcd.print(sec);
+        lcd.print(" ");        
+    }
+    else{
+        lcd.print(sec);
+        lcd.print(" ");
+    }
+}
+
 #endif

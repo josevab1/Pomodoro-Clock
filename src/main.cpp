@@ -6,20 +6,25 @@
 #include "DisplayHelper.h"
 #include "ButtonSwitch.h"
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 16, 2); // D1 is TX, D0 is RX i2c
 Servo servo;
 
 // For Pomodoro Mode
-const uint8_t Pomodoro_Button = 2;
+const uint8_t Pomodoro_Button = 2; // PD2 
+// For Edit Mode
+const uint8_t Edit_Button = 3; // PD3
+const uint8_t Cursor_Button = 4; // PD4
+const uint8_t Inc_Button = 5; // PD5
+const uint8_t Dec_Button = 6; // PD6
+// For Lock in Mode
+// const uint8_t Lock_In_Button = 7; 
 
-ButtonSwitch pomoSwitch(Pomodoro_Button);
-
-int8_t INITIAL_WORK_TIME = 0; // default it to 25 mins
-int8_t INITIAL_REST_TIME = 0; // default it to 5 mins
+int8_t INITIAL_WORK_TIME = 25; // default it to 25 mins
+int8_t INITIAL_REST_TIME = 5; // default it to 5 mins
 int8_t INITIAL_LONG_REST_TIME = 10; //LONG REST 
 
-int8_t INITIAL_WORK_TIME_SEC = 5; 
-int8_t INITIAL_REST_TIME_SEC = 5;
+int8_t INITIAL_WORK_TIME_SEC = 0; 
+int8_t INITIAL_REST_TIME_SEC = 0;
 int8_t INITIAL_LONG_REST_TIME_SEC = 0;
 
 int8_t Work_Time = INITIAL_WORK_TIME; 
@@ -36,6 +41,7 @@ uint8_t cycle_count = 0;
 bool cycle_counted = false;
 
 bool pomo_done = false;
+
 // indicate by angle 
 // 0 = idle
 // 45 = finished cycle
@@ -43,24 +49,8 @@ bool pomo_done = false;
 // 135 = work
 // 180 = edit
 uint8_t servo_pin = 13;
-
-bool Current_Pomo_Button_State;
-bool Last_Pomo_Button_State;
-bool pomoState = false;
-
 uint8_t servo_pos = 0;
 
-// For Edit Mode
-const uint8_t Edit_Button = 3;
-
-// Make button to a switch
-ButtonSwitch editSwitch(Edit_Button);
-
-const uint8_t Cursor_Button = 4;
-ButtonSwitch cursorSwitch(Cursor_Button);
-
-const uint8_t Inc_Button = 5;
-const uint8_t Dec_Button = 6;
 
 bool Last_Cursor_Button_State;
 bool Current_Cursor_Button_State;
@@ -70,13 +60,19 @@ bool Current_Edit_Button_State;
 bool Last_Edit_Button_State;
 bool editState = false;
 
+bool Current_Pomo_Button_State;
+bool Last_Pomo_Button_State;
+bool pomoState = false;
+
+
+// Make button to a switch
+ButtonSwitch editSwitch(Edit_Button);
+ButtonSwitch cursorSwitch(Cursor_Button);
+ButtonSwitch pomoSwitch(Pomodoro_Button);
 
 void pomo_setup(){
-  pinMode(Pomodoro_Button, INPUT_PULLUP);
-
   lcd.init();
   lcd.clear();
-  delay(100); // realized that distance affect i2c, just make connection close as possible
   lcd.backlight();
   lcd.clear();
 
@@ -96,15 +92,12 @@ void pomo_setup(){
 
   // rest_minute_dispaly
   rest_minute_display(lcd, Rest_Time);
-
   rest_second_display(lcd, Rest_Time_Sec);
+
   servo.attach(servo_pin);
+};
 
-}
-
-void edit_setup(){
-  pinMode(Edit_Button, INPUT_PULLUP);
-  pinMode(Cursor_Button, INPUT_PULLUP);
+void edit_setup(){ // Make these buttons as interrupts 
   pinMode(Inc_Button, INPUT_PULLUP);
   pinMode(Dec_Button, INPUT_PULLUP);
 
@@ -135,8 +128,6 @@ void work_time_tick(){
         Work_Time_Sec = -1;
       }
     }
-
-
 work_minute_display(lcd, Work_Time);
 work_second_display(lcd, Work_Time_Sec);
     //Serial.println(Work_Time_Sec);
@@ -177,6 +168,40 @@ void rest_time_tick(){
     //Serial.print(Rest_Time);
   }
 
+
+// Long Rest skipped for now.
+void long_rest_time_tick(){
+  
+  uint64_t currentTime = millis();
+  
+  if(currentTime - lastUpdate >= 1000){
+    lastUpdate = currentTime;  // Update the timestamp 
+        //Serial.print(lastUpdate);
+        //Serial.println(currentTime);
+    if(Long_Rest_Time >= 0 || Long_Rest_Time_Sec >= 0){
+      Long_Rest_Time_Sec = Long_Rest_Time_Sec - 1;
+      if(Long_Rest_Time_Sec< 0 && Long_Rest_Time >= 1){
+        Long_Rest_Time = Long_Rest_Time - 1;
+        Long_Rest_Time_Sec= 59;
+      }
+      else if(Long_Rest_Time_Sec < 0 && Long_Rest_Time < 1){
+        Long_Rest_Time_Sec= 59;
+      }
+    }
+    if(Long_Rest_Time_Sec == 0 && Long_Rest_Time == 0){
+      Long_Rest_Time = -1;
+      Long_Rest_Time_Sec = -1;
+    }
+
+    long_rest_minute_display(lcd, Long_Rest_Time);
+    long_rest_second_display(lcd, Long_Rest_Time_Sec);
+    
+    }
+    //Serial.println(Rest_Time_Sec);
+    //Serial.print(":");
+    //Serial.print(Rest_Time);
+  }
+
 void pomo_mode(bool mode){
   bool pomo = digitalRead(Pomodoro_Button);
   bool pomo_done = false;
@@ -207,11 +232,6 @@ void pomo_mode(bool mode){
       //Serial.println(Rest_Time);
       servo.write(135);
 
-      // Bug when pomo is at rest,
-      // Then edit pomo time to more than 0,
-      // Comes here, but is stuck.
-      
-
     }
     else if(Work_Time < 0 && Work_Time_Sec < 0 && Rest_Time >= 0){
       lcd.setCursor(12,1);
@@ -232,13 +252,10 @@ void pomo_mode(bool mode){
       cycle_count = cycle_count + 1;
       cycle_counted = true;
       }
-      if(cycle_counted % 2 == 0){}
-
-// if mode counter is 2 (2 work + 2 rest), 
-// then long rest instead of rest
-
-// lock in mode = true
-
+      
+      else if(cycle_counted % 2 == 0){
+        long_rest_time_tick();
+      }
 
       pomo_done = true;
 
@@ -303,7 +320,7 @@ void edit_mode(bool state){
   // if at those cursor, can inc or dec rest/work time
 
   // If cursor count is hit every 3rd time
-  // then edit long rest
+  // then edit "long rest"
 if(INITIAL_WORK_TIME < 1) INITIAL_WORK_TIME = 99;
 if(INITIAL_WORK_TIME > 99) INITIAL_WORK_TIME = 1;
 
@@ -391,7 +408,6 @@ if(INITIAL_REST_TIME > 99) INITIAL_REST_TIME = 1;
         }
         rest_minute_display(lcd, Rest_Time);
         rest_second_display(lcd, Rest_Time_Sec);
-
     }
   }
 
@@ -417,7 +433,6 @@ void setup() {
 }
 
 void loop() {
-
 
 // Edit Mode
 editState = editSwitch.as_switch();
@@ -454,7 +469,5 @@ if(pomo_done == true){
     pomo_done = false;
 }
 
-Serial.print(Work_Time_Sec);
-Serial.println(Rest_Time_Sec);
 }
 
